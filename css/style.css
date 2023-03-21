@@ -1,0 +1,59 @@
+body {
+    background-color: rgb(200, 211, 220);
+    font-family: Verdana, Arial, Helvetica, sans-serif
+}
+
+header h1 {
+    letter-spacing: 2rem;
+    font-weight: bolder;
+}
+
+a, a:hover {
+    text-decoration: none;
+    color: white;
+}
+
+.collapse a:hover {
+    background-color: rgb(139, 163, 214);
+}
+
+.page-content {
+    background-color: white;
+    box-shadow: 10px 5px 5px gray;
+}
+
+.dark-blue-color {
+    background-color: rgb(45, 57, 83);
+}
+
+.border-gray {
+    border: 2px solid gray;
+}
+
+button.dark-blue-color:hover, button.dark-blue-color:active {
+    background-color: rgb(104, 135, 202) !important;
+}
+
+.nav-button-active {
+    background-color: rgb(104, 135, 202);
+    font-weight: bolder;
+}
+
+a.nav-button-active:hover {
+    background-color: rgb(104, 135, 202);
+    font-weight: bolder;
+}
+
+@media all and (max-width: 1200px) {
+    .page-content {
+        background-color: white;
+        box-shadow: none;
+    }
+
+    .container-xl {
+        padding-left: 0;
+        padding-right: 0;
+    }
+}
+
+
