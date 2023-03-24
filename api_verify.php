@@ -95,10 +95,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         $menu_array = array();
                         $item_array = array();
 
-                        for ($i=0; $i < $text_list->length; $i++) {
-                            $text = trim($text_list->item($i)->textContent);
+                        for ($i=1; $i < $text_list->length + 1; $i++) {
+                            $text = trim($text_list->item($i - 1)->textContent);
 
-                            ++$i;
                             switch ($i % 3) {
                                 case 1:
                                     $item_array["description"] = $text;
@@ -116,15 +115,98 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                     echo "Neznámy počet parametrov";
                                     break;
                             }
-                            --$i;
                         }
 
-                        $sql = "INSERT INTO menu_item(name, restaurant_id, description, price, day, date) VALUES(?,?,?,?,?,?)";
+                        $sql = "INSERT INTO menu_item(name, restaurant_id, description, price, day, date) 
+                                VALUES(:name, :restaurant_id, :description, :price, :day, :date)
+                                ON DUPLICATE KEY UPDATE description = :description, price = :price, day = :day, date = :date";
                         $stmt = $pdo->prepare($sql);
                         foreach ($menu_array as $item)
-                            if (!$stmt->execute(
-                                [$item["name"], $restaurant_id, $item["description"], $item["price"], Day::from($day_order)->name, date("Y-m-d", strtotime(Day::from($day_order)->name . " this week"))]
-                            ))
+                            if (!$stmt->execute([
+                                ":name" => $item["name"],
+                                ":restaurant_id" => $restaurant_id,
+                                ":description" => $item["description"],
+                                ":price" => $item["price"],
+                                ":day" => Day::from($day_order)->name,
+                                ":date" => date("Y-m-d", strtotime(Day::from($day_order)->name . " this week"))
+                            ]))
+                                $failed = true;
+                        ++$day_order;
+                    }
+                }
+                else if ($restaurant_html["restaurant_name"] == "venza") {
+                    $daily_menu_list =  $xpath->query('//div[@id="pills-tabContent"]//div[@class="menubar"]/div');
+
+                    $day_order = 1;
+                    foreach ($daily_menu_list as $daily_menu) {
+                        $xpath_query = './div/div';
+                        $menu_item_list = $xpath->evaluate($xpath_query, $daily_menu);
+                        $menu_array = array();
+                        $item_array = array();
+                        $is_soup_done = false;
+
+                        foreach ($menu_item_list as $menu_item) {
+                            $xpath_query = './/text()[normalize-space()]';
+                            $text_list = $xpath->evaluate($xpath_query, $menu_item);
+
+                            if ($is_soup_done) {
+                                for ($i=0; $i < $text_list->length; $i++) {
+                                    $text = trim($text_list->item($i)->textContent);
+                                    switch ($i % 4) {
+                                        case 0:
+                                            $item_array["description"] = $text;
+                                            break;
+                                        case 1:
+                                            $item_array["name"] = $text;
+                                            break;
+                                        case 2:
+                                        case 3:
+                                            if ($text[0] == "(")
+                                                $item_array["name"] .= " " . $text;
+                                            else if (is_numeric($text[0])) {
+                                                $item_array["price"] = $text;
+                                                $menu_array[] = $item_array;
+                                                $item_array = array();
+                                            }
+                                            break;
+                                        default:
+                                            $failed = true;
+                                            echo "Neznámy počet parametrov";
+                                            break;
+                                    }
+                                }
+                            }
+                            else {
+                                for ($i=1; $i < $text_list->length; $i++) {
+                                    $text = trim($text_list->item($i)->textContent);
+                                    if ($text[0] == "(")
+                                        $item_array["name"] .= " " . $text;
+                                    else if (is_numeric($text[0])) {
+                                        $item_array["price"] = $text;
+                                        $item_array["description"] = "Polievka";
+                                        $menu_array[] = $item_array;
+                                        $item_array = array();
+                                    }
+                                    else
+                                        $item_array["name"] = $text;
+                                }
+                                $is_soup_done = true;
+                            }
+                        }
+
+                        $sql = "INSERT INTO menu_item(name, restaurant_id, description, price, day, date) 
+                                VALUES(:name, :restaurant_id, :description, :price, :day, :date)
+                                ON DUPLICATE KEY UPDATE description = :description, price = :price, day = :day, date = :date";
+                        $stmt = $pdo->prepare($sql);
+                        foreach ($menu_array as $item)
+                            if (!$stmt->execute([
+                                ":name" => $item["name"],
+                                ":restaurant_id" => $restaurant_id,
+                                ":description" => $item["description"],
+                                ":price" => $item["price"],
+                                ":day" => Day::from($day_order)->name,
+                                ":date" => date("Y-m-d", strtotime(Day::from($day_order)->name . " this week"))
+                            ]))
                                 $failed = true;
                         ++$day_order;
                     }
