@@ -3,7 +3,10 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
+echo "<script>console.log('HERE');</script>";
+
 require_once('config.php');
+require_once('day_enum.php');
 
 function curlDownload($url) {
     $ch=curl_init();
@@ -16,7 +19,7 @@ function curlDownload($url) {
 }
 
 function getDOM($html) {
-    $dom = new DOMDocument("1.0", "UTF-8");
+    $dom = new DOMDocument();
     $internalErrors = libxml_use_internal_errors(true);
     $dom->loadHTML($html);
     libxml_use_internal_errors($internalErrors);
@@ -24,52 +27,121 @@ function getDOM($html) {
 }
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
+
     if (isset($_POST['action']) && $_POST['action'] == 'download') {
+        $failed = false;
+        $pdo->beginTransaction();
+        
         $dom = getDOM(curlDownload('http://www.freefood.sk/menu/#fiit-food'));
-        $xpath = new DOMXPath($dom);
-        $xpath_menu = $xpath->query('//div[@id="fiit-food"]//ul[@class="daily-offer"]');
-        $raw_menu = $dom->saveHTML($xpath_menu->item(0));
-        $sql = "INSERT INTO raw_data (restaurant_name, data) VALUES (?,?)";
+        $sql = "INSERT INTO restaurant_html (restaurant_name, html) VALUES (?,?)";
         $stmt = $pdo->prepare($sql);
-        $stmt->execute(["fiitfood", $raw_menu]);
+        if (!$stmt->execute(["fiitfood", $dom->saveHTML()]))
+            $failed = true;
         
         $dom = getDOM(curlDownload('https://www.novavenza.sk/tyzdenne-menu'));
-        $xpath = new DOMXPath($dom);
-        $xpath_menu = $xpath->query('//div[@id="pills-tabContent"]');
-        $raw_menu = $dom->saveHTML($xpath_menu->item(0));
-        $sql = "INSERT INTO raw_data (restaurant_name, data) VALUES (?,?)";
+        // $xpath = new DOMXPath($dom);
+        // $xpath_menu = $xpath->query('//div[@id="pills-tabContent"]');
+        // $raw_menu = $dom->saveHTML($xpath_menu->item(0));
+        $sql = "INSERT INTO restaurant_html (restaurant_name, html) VALUES (?,?)";
         $stmt = $pdo->prepare($sql);
-        $stmt->execute(["venza", $raw_menu]);
+        if (!$stmt->execute(["venza", $dom->saveHTML()]))
+            $failed = true;
         
         $dom = getDOM(curlDownload('http://eatandmeet.sk/tyzdenne-menu'));
-        $xpath = new DOMXPath($dom);
-        $xpath_menu = $xpath->query('//div[@class="tab-content weak-menu" and div[1][@id="day-1"]]');
-        $raw_menu = $dom->saveHTML($xpath_menu->item(0));
-        $sql = "INSERT INTO raw_data (restaurant_name, data) VALUES (?,?)";
+        // $xpath = new DOMXPath($dom);
+        // $xpath_menu = $xpath->query('//div[@class="tab-content weak-menu" and div[1][@id="day-1"]]');
+        // $raw_menu = $dom->saveHTML($xpath_menu->item(0));
+        $sql = "INSERT INTO restaurant_html (restaurant_name, html) VALUES (?,?)";
         $stmt = $pdo->prepare($sql);
-        $stmt->execute(["eatandmeet", $raw_menu]);
+        if (!$stmt->execute(["eatandmeet", $dom->saveHTML()]))
+            $failed = true;
+
+        if ($failed) {
+            $pdo->rollBack();
+            echo "Nastala chyba. Zopakujte operáciu.";
+        }
+        else
+            $pdo->commit();
     }
 
     if (isset($_POST['action']) && $_POST['action'] == 'parse') {
-        $sql = "SELECT * FROM raw_data ORDER BY id DESC LIMIT 3";
-        $raw_data = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+        $sql = "SELECT * FROM restaurant_html ORDER BY created_at DESC LIMIT 3";
+        $restaurant_html_array = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
 
-        foreach ($raw_data as $raw_menu) {
-            if ($raw_menu["restaurant_name"] == "fiitfood") {
-                
+        foreach ($restaurant_html_array as $restaurant_html) {
+            $sql = "INSERT INTO restaurant(name) VALUES(?)
+                    ON DUPLICATE KEY UPDATE id=id";
+            $stmt = $pdo->prepare($sql);
+            
+            if ($stmt->execute([$restaurant_html["restaurant_name"]])) {
+                $sql = "SELECT id FROM restaurant WHERE name = ?";
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([$restaurant_html["restaurant_name"]]);
+                $restaurant_id = $stmt->fetchColumn();
+
+                $dom = getDOM($restaurant_html["html"]);
+                $xpath = new DOMXPath($dom);
+
+                $failed = false;
+                $pdo->beginTransaction();
+
+                if ($restaurant_html["restaurant_name"] == "fiitfood") {
+                    $daily_menu_list =  $xpath->query('//div[@id="fiit-food"]//ul[@class="daily-offer"]/li/ul[@class="day-offer"]');
+
+                    $day_order = 1;
+                    foreach ($daily_menu_list as $daily_menu) {
+                        $xpath_query = './/text()';
+                        $text_list = $xpath->evaluate($xpath_query, $daily_menu);
+                        $menu_array = array();
+                        $item_array = array();
+
+                        for ($i=0; $i < $text_list->length; $i++) {
+                            $text = trim($text_list->item($i)->textContent);
+
+                            ++$i;
+                            switch ($i % 3) {
+                                case 1:
+                                    $item_array["description"] = $text;
+                                    break;
+                                case 2:
+                                    $item_array["name"] = $text;
+                                    break;
+                                case 0:
+                                    $item_array["price"] = $text;
+                                    $menu_array[] = $item_array;
+                                    $item_array = array();
+                                    break;
+                                default:
+                                    $failed = true;
+                                    echo "Neznámy počet parametrov";
+                                    break;
+                            }
+                            --$i;
+                        }
+
+                        $sql = "INSERT INTO menu_item(name, restaurant_id, description, price, day, date) VALUES(?,?,?,?,?,?)";
+                        $stmt = $pdo->prepare($sql);
+                        foreach ($menu_array as $item)
+                            if (!$stmt->execute(
+                                [$item["name"], $restaurant_id, $item["description"], $item["price"], Day::from($day_order)->name, date("Y-m-d", strtotime(Day::from($day_order)->name . " this week"))]
+                            ))
+                                $failed = true;
+                        ++$day_order;
+                    }
+                }
+
+                if ($failed) {
+                    echo "Nastala chyba. Zopakujte operáciu.";
+                    $pdo->rollBack();
+                }
+                else
+                    $pdo->commit();
             }
+            else
+                echo "Nastala chyba. Zopakujte operáciu.";
         }
     }
 }
-
-
-
-
-// $results = $xpath->query('//div[@id="fiit-food"]//ul[@class="day-offer"]/li//text()');
-
-// foreach($nodes as $li) {
-//     echo $li->nodeValue . "<br>";
-// }
 
 unset($stmt);
 unset($pdo);
