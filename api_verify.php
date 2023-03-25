@@ -39,18 +39,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $failed = true;
         
         $dom = getDOM(curlDownload('https://www.novavenza.sk/tyzdenne-menu'));
-        // $xpath = new DOMXPath($dom);
-        // $xpath_menu = $xpath->query('//div[@id="pills-tabContent"]');
-        // $raw_menu = $dom->saveHTML($xpath_menu->item(0));
         $sql = "INSERT INTO restaurant_html (restaurant_name, html) VALUES (?,?)";
         $stmt = $pdo->prepare($sql);
         if (!$stmt->execute(["venza", $dom->saveHTML()]))
             $failed = true;
         
         $dom = getDOM(curlDownload('http://eatandmeet.sk/tyzdenne-menu'));
-        // $xpath = new DOMXPath($dom);
-        // $xpath_menu = $xpath->query('//div[@class="tab-content weak-menu" and div[1][@id="day-1"]]');
-        // $raw_menu = $dom->saveHTML($xpath_menu->item(0));
         $sql = "INSERT INTO restaurant_html (restaurant_name, html) VALUES (?,?)";
         $stmt = $pdo->prepare($sql);
         if (!$stmt->execute(["eatandmeet", $dom->saveHTML()]))
@@ -211,6 +205,70 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         ++$day_order;
                     }
                 }
+                else if ($restaurant_html["restaurant_name"] == "eatandmeet") {
+                    $days = range(1, 7);
+                    $xpath_query = '//div[';
+                    foreach ($days as $day)
+                        $xpath_query .= '@id="day-' . $day . '"' . ' or ';
+                    $xpath_query = rtrim($xpath_query, ' or ') . ']';
+
+                    $daily_menu_list = $xpath->query($xpath_query);
+
+                    $day_order = 1;
+                    foreach ($daily_menu_list as $daily_menu) {
+                        $xpath_query = './div';
+                        $menu_item_list = $xpath->evaluate($xpath_query, $daily_menu);
+                        $menu_array = array();
+                        $item_array = array();
+                        $is_soup_done = false;
+
+                        foreach ($menu_item_list as $menu_item) {
+                            $xpath_query = './/text()[normalize-space()]';
+                            $text_list = $xpath->evaluate($xpath_query, $menu_item);
+
+                            for ($i=0; $i < $text_list->length; $i++) {
+                                $text = trim($text_list->item($i)->textContent);
+                                switch ($i % 5) {
+                                    case 0:
+                                        $item_array["description"] = $text;
+                                        break;
+                                    case 1:
+                                        $item_array["price"] = $text;
+                                        break;
+                                    case 2:
+                                        $item_array["price"] .= " " . $text;
+                                        break;
+                                    case 3:
+                                        $item_array["name"] = $text;
+                                        break;
+                                    case 4:
+                                        $item_array["name"] .= " " . $text;
+                                        break;
+                                }
+                                if ($i == $text_list->length - 1) {
+                                    $menu_array[] = $item_array;
+                                    $item_array = array();
+                                }
+                            }
+                        }
+
+                        $sql = "INSERT INTO menu_item(name, restaurant_id, description, price, day, date) 
+                                VALUES(:name, :restaurant_id, :description, :price, :day, :date)
+                                ON DUPLICATE KEY UPDATE description = :description, price = :price, day = :day, date = :date";
+                        $stmt = $pdo->prepare($sql);
+                        foreach ($menu_array as $item)
+                            if (!$stmt->execute([
+                                ":name" => $item["name"],
+                                ":restaurant_id" => $restaurant_id,
+                                ":description" => $item["description"],
+                                ":price" => $item["price"],
+                                ":day" => Day::from($day_order)->name,
+                                ":date" => date("Y-m-d", strtotime(Day::from($day_order)->name . " this week"))
+                            ]))
+                                $failed = true;
+                        ++$day_order;
+                    }
+                }
 
                 if ($failed) {
                     echo "Nastala chyba. Zopakujte operáciu.";
@@ -221,6 +279,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
             else
                 echo "Nastala chyba. Zopakujte operáciu.";
+        }
+    }
+
+    if (isset($_POST['action']) && $_POST['action'] == 'delete') {
+        $tables = array("restaurant_html", "restaurant", "menu_item");
+        foreach ($tables as $table) {
+            $stmt = $pdo->prepare("DELETE FROM {$table}");
+            $stmt->execute();
         }
     }
 }
