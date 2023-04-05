@@ -2,6 +2,21 @@
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
+
+$response = file_get_contents('https://site60.webte.fei.stuba.sk/webte2-zadanie2/api/restaurants/meals/');
+$response = json_decode($response, true);
+
+$grouped_data = array();
+foreach ($response as $item) {
+    if ($item['day'] !== null) {
+        $grouped_data[$item['restaurant_id']][$item['day']][] = $item;
+    } else {
+        $grouped_data[$item['restaurant_id']][null][] = $item;
+    }
+}
+
+$this_monday = date("d/m/Y", strtotime("Monday this week"));
+$this_sunday = date("d/m/Y", strtotime("Sunday this week"));
 ?>
 
 <!DOCTYPE html>
@@ -41,8 +56,87 @@ error_reporting(E_ALL);
         </div>
 
         <div class="page-content p-3">
-            <h2 class="pb-3">Jedálny lístok</h2>
+            <h2 class="pb-3">Jedálny lístok <?php echo "({$this_monday} - {$this_sunday})"?></h2>
+            <?php if (empty($response)): ?>
+            <p>
+                V databáze nie sú žiadne dáta, prosím prejdite na podstránku Overenie API. 
+                Tam stlačte tlačidlá Stiahni a Rozparsuj a prejdite opäť na podstránku Jedálny lístok.
+            </p>;
+            <?php else: ?>
+            <div class="row">
+                <?php foreach ($grouped_data as $restaurant_id => $restaurant_data): 
+                    $null_days_data = array();
+                ?>
+                <div class="col-4">
+                    <h3 class="text-center"><?php echo $restaurant_id; ?></h3>
+                    <?php foreach ($restaurant_data as $day => $day_data): ?>
+                        <?php if ($day != null): ?>
+                        <div>
+                            <h4><?php echo $day; ?></h4>
+                            <div>
+                            <?php foreach ($day_data as $item): ?>
+                                <h5><?php echo $item['description']; ?></h5>
+                                <p><?php echo $item['name']; ?></p>
+                            <?php endforeach; ?>
+                            </div>
+                        </div>
+                        <?php else: 
+                            $null_days_data[] = $day_data;
+                        ?>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
 
+                    <?php if (!empty($null_days_data)): ?>
+                    <div>
+                        <h4>Mimo od dennej ponuky</h4>
+                        <div>
+                        <?php foreach ($null_days_data as $data): ?>
+                            <?php foreach ($data as $item): ?>
+                            <h5><?php echo $item['description']; ?></h5>
+                            <p><?php echo $item['name']; ?></p>
+                            <?php endforeach; ?>
+                        <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                </div>
+                <?php endforeach; ?>
+            </div>
+                    
+                <!-- foreach ($grouped_data as $restaurant_id => $restaurant_data) {
+                echo '<h2>Restaurant ID: ' . $restaurant_id . '</h2>';
+                echo '<table>';
+                echo '<tr><th>Day</th><th>Name</th><th>Description</th><th>Price</th></tr>';
+                foreach ($restaurant_data as $day => $day_data) {
+                    if ($day !== null) {
+                        echo '<tr><td colspan="4"><strong>' . $day . '</strong></td></tr>';
+                    }
+                    $displayed_days = array();
+                    foreach ($day_data as $item) {
+                        if ($day === null || !in_array($day, $displayed_days)) {
+                            echo '<tr>';
+                            echo '<td>' . ($day === null ? 'Null' : $day) . '</td>';
+                            echo '<td>' . $item['name'] . '</td>'; -->
+
+            <!-- <div class='row'>
+                <div class='col-4'>
+                    <h3 class="text-center">FIITFOOD</h3>
+                    <div>
+                        <h4>Monday</h4>
+                        <div>
+                            <h5>Polievka</h5>
+                            <p>Gulasova 5e</p>
+                        </div>
+                    </div>
+                </div>
+                <div class='col-4'>
+                    <h3 class="text-center">Venza</h3>
+                </div>
+                <div class='col-4'>
+                    <h3 class="text-center">Eat & Meet</h3>
+                </div>
+            </div> -->
+            <?php endif; ?>
         </div>
         
     </div>

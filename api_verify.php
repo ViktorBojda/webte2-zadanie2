@@ -3,8 +3,6 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-echo "<script>console.log('HERE');</script>";
-
 require_once('config.php');
 require_once('day_enum.php');
 
@@ -111,9 +109,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             }
                         }
 
-                        $sql = "INSERT INTO menu_item(name, restaurant_id, description, price, day, date) 
-                                VALUES(:name, :restaurant_id, :description, :price, :day, :date)
-                                ON DUPLICATE KEY UPDATE description = :description, price = :price, day = :day, date = :date";
+                        $sql = "INSERT INTO menu_item(name, restaurant_id, description, price, day, start_date, end_date) 
+                                VALUES(:name, :restaurant_id, :description, :price, :day, :start_date, :end_date)
+                                ON DUPLICATE KEY UPDATE description = :description, price = :price, day = :day, start_date = :start_date, end_date = :end_date";
                         $stmt = $pdo->prepare($sql);
                         foreach ($menu_array as $item)
                             if (!$stmt->execute([
@@ -122,7 +120,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 ":description" => $item["description"],
                                 ":price" => $item["price"],
                                 ":day" => Day::from($day_order)->name,
-                                ":date" => date("Y-m-d", strtotime(Day::from($day_order)->name . " this week"))
+                                ":start_date" => date("Y-m-d", strtotime(Day::from($day_order)->name . " this week")),
+                                ":end_date" => date("Y-m-d", strtotime(Day::from($day_order)->name . " this week"))
                             ]))
                                 $failed = true;
                         ++$day_order;
@@ -188,9 +187,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             }
                         }
 
-                        $sql = "INSERT INTO menu_item(name, restaurant_id, description, price, day, date) 
-                                VALUES(:name, :restaurant_id, :description, :price, :day, :date)
-                                ON DUPLICATE KEY UPDATE description = :description, price = :price, day = :day, date = :date";
+                        $sql = "INSERT INTO menu_item(name, restaurant_id, description, price, day, start_date, end_date) 
+                                VALUES(:name, :restaurant_id, :description, :price, :day, :start_date, :end_date)
+                                ON DUPLICATE KEY UPDATE description = :description, price = :price, day = :day, start_date = :start_date, end_date = :end_date";
                         $stmt = $pdo->prepare($sql);
                         foreach ($menu_array as $item)
                             if (!$stmt->execute([
@@ -199,7 +198,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 ":description" => $item["description"],
                                 ":price" => $item["price"],
                                 ":day" => Day::from($day_order)->name,
-                                ":date" => date("Y-m-d", strtotime(Day::from($day_order)->name . " this week"))
+                                ":start_date" => date("Y-m-d", strtotime(Day::from($day_order)->name . " this week")),
+                                ":end_date" => date("Y-m-d", strtotime(Day::from($day_order)->name . " this week"))
                             ]))
                                 $failed = true;
                         ++$day_order;
@@ -252,9 +252,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             }
                         }
 
-                        $sql = "INSERT INTO menu_item(name, restaurant_id, description, price, day, date) 
-                                VALUES(:name, :restaurant_id, :description, :price, :day, :date)
-                                ON DUPLICATE KEY UPDATE description = :description, price = :price, day = :day, date = :date";
+                        $sql = "INSERT INTO menu_item(name, restaurant_id, description, price, day, start_date, end_date) 
+                                VALUES(:name, :restaurant_id, :description, :price, :day, :start_date, :end_date)
+                                ON DUPLICATE KEY UPDATE description = :description, price = :price, day = :day, start_date = :start_date, end_date = :end_date";
                         $stmt = $pdo->prepare($sql);
                         foreach ($menu_array as $item)
                             if (!$stmt->execute([
@@ -263,7 +263,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 ":description" => $item["description"],
                                 ":price" => $item["price"],
                                 ":day" => Day::from($day_order)->name,
-                                ":date" => date("Y-m-d", strtotime(Day::from($day_order)->name . " this week"))
+                                ":start_date" => date("Y-m-d", strtotime(Day::from($day_order)->name . " this week")),
+                                ":end_date" => date("Y-m-d", strtotime(Day::from($day_order)->name . " this week"))
                             ]))
                                 $failed = true;
                         ++$day_order;
