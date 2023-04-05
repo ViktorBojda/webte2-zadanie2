@@ -16,19 +16,36 @@ switch($_SERVER['REQUEST_METHOD']) {
             read_meals($pdo);
         break;
     case 'POST':
-        create_meal($pdo, json_decode(file_get_contents('php://input'), true));
+        $json = json_decode(file_get_contents('php://input'), true);
+        if ($json == null) {
+            echo json_encode(array('error' => 'Create failed, failed to read request body'));
+            http_response_code(422);
+            break;
+        }
+        create_meal($pdo, $json);
         break;
     case 'PUT':
-        if (isset($_GET['id']))
-            update_meal($pdo, $_GET['id'], json_decode(file_get_contents('php://input'), true));
-        else
+        if (isset($_GET['id'])) {
+            $json = json_decode(file_get_contents('php://input'), true);
+            if ($json == null) {
+                echo json_encode(array('error' => 'Create failed, failed to read request body'));
+                http_response_code(422);
+                break;
+            }
+            update_meal($pdo, $_GET['id'], $json);
+        }
+        else {
+            echo json_encode(array('error' => 'Update failed, missing id query parameter'));
             http_response_code(400);
+        }
         break;
     case 'DELETE':
         if (isset($_GET['id']))
             delete_meals_by_restaurant_id($pdo, $_GET['id']);
-        else
+        else {
+            echo json_encode(array('error' => 'Delete failed, missing id query parameter'));
             http_response_code(400);
+        }
         break;
 }
 
@@ -43,7 +60,7 @@ function read_meals($pdo) {
 }
 
 function read_meals_by_date($pdo, $date) {
-    $sql = "SELECT * FROM menu_item WHERE ? BETWEEN start_date AND end_date";
+    $sql = "SELECT * FROM menu_item WHERE ? BETWEEN start_date AND end_date ORDER BY restaurant_id, start_date, description ASC";
     $stmt = $pdo->prepare($sql);
     $stmt->execute([$date]);
     $meals = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -159,8 +176,10 @@ function update_meal($pdo, $id, $data) {
         ":start_date" => $start_date,
         ":end_date" => $end_date,
         ":id" => $id
-    ]))
+    ])) {
         echo json_encode(array('error' => 'Update failed'));
+        http_response_code(400);
+    }
     echo json_encode(array('success' => 'Data updated successfully'));
 }
 

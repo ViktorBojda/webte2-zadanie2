@@ -9,7 +9,7 @@ $json_example = json_encode(json_decode(
     "description": "Vegetariánske",
     "price": "3,80 €",
     "start_date": "2023-01-01",
-    "end": "2023-01-01"}'
+    "end_date": "2023-01-01"}'
 ), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 ?>
 

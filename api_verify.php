@@ -24,7 +24,41 @@ function getDOM($html) {
     return $dom;
 }
 
+function alert($msg) {
+    echo "<script type='text/javascript'>alert('$msg');</script>";
+}
+
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
+
+    if (isset($_POST['action']) && $_POST['action'] == 'test-api-request') {
+        $basic_url = 'https://site60.webte.fei.stuba.sk/webte2-zadanie2/api.php?';
+        $options = ['http' => [
+            'header' => 'Content-type:application/json',
+            'ignore_errors' => true,
+            'content' => $_POST['test-json-body']
+        ]];
+
+        switch ($_POST['test-request-method']) {
+            case 'POST':
+                $options['http']['method'] = "POST";
+                $context = stream_context_create($options);
+                alert(file_get_contents($basic_url, false, $context));
+                break;
+            case 'PUT':
+                $options['http']['method'] = "PUT";
+                $context = stream_context_create($options);
+                alert(file_get_contents($basic_url . $_POST['test-query-params'], false, $context));
+                break;
+            case 'DELETE':
+                $options['http']['method'] = "DELETE";
+                $context = stream_context_create($options);
+                alert(file_get_contents($basic_url . $_POST['test-query-params'], false, $context));
+                break;
+            default:
+                alert("Unknown test request method");
+                break;
+        }
+    }
 
     if (isset($_POST['action']) && $_POST['action'] == 'download') {
         $failed = false;
@@ -33,19 +67,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $dom = getDOM(curlDownload('http://www.freefood.sk/menu/#fiit-food'));
         $sql = "INSERT INTO restaurant_html (restaurant_name, html) VALUES (?,?)";
         $stmt = $pdo->prepare($sql);
-        if (!$stmt->execute(["fiitfood", $dom->saveHTML()]))
+        if (!$stmt->execute(["FiitFood", $dom->saveHTML()]))
             $failed = true;
         
         $dom = getDOM(curlDownload('https://www.novavenza.sk/tyzdenne-menu'));
         $sql = "INSERT INTO restaurant_html (restaurant_name, html) VALUES (?,?)";
         $stmt = $pdo->prepare($sql);
-        if (!$stmt->execute(["venza", $dom->saveHTML()]))
+        if (!$stmt->execute(["Venza", $dom->saveHTML()]))
             $failed = true;
         
         $dom = getDOM(curlDownload('http://eatandmeet.sk/tyzdenne-menu'));
         $sql = "INSERT INTO restaurant_html (restaurant_name, html) VALUES (?,?)";
         $stmt = $pdo->prepare($sql);
-        if (!$stmt->execute(["eatandmeet", $dom->saveHTML()]))
+        if (!$stmt->execute(["Eat & Meet", $dom->saveHTML()]))
             $failed = true;
 
         if ($failed) {
@@ -77,7 +111,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $failed = false;
                 $pdo->beginTransaction();
 
-                if ($restaurant_html["restaurant_name"] == "fiitfood") {
+                if ($restaurant_html["restaurant_name"] == "FiitFood") {
                     $daily_menu_list =  $xpath->query('//div[@id="fiit-food"]//ul[@class="daily-offer"]/li/ul[@class="day-offer"]');
 
                     $day_order = 1;
@@ -127,7 +161,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         ++$day_order;
                     }
                 }
-                else if ($restaurant_html["restaurant_name"] == "venza") {
+                else if ($restaurant_html["restaurant_name"] == "Venza") {
                     $daily_menu_list =  $xpath->query('//div[@id="pills-tabContent"]//div[@class="menubar"]/div');
 
                     $day_order = 1;
@@ -205,7 +239,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         ++$day_order;
                     }
                 }
-                else if ($restaurant_html["restaurant_name"] == "eatandmeet") {
+                else if ($restaurant_html["restaurant_name"] == "Eat & Meet") {
                     $days = range(1, 7);
                     $xpath_query = '//div[';
                     foreach ($days as $day)
@@ -337,7 +371,7 @@ unset($pdo);
             <h2 class="pb-3">Overenie metód API</h2>
 
             <form action="" method="post">
-                <div class="row">
+                <div class="row mb-5">
                     <div class="col-4 d-grid">
                         <button class='btn btn-primary' name="action" value="download" type='submit'>Stiahni</button>
                     </div>
@@ -352,6 +386,35 @@ unset($pdo);
                 </div>
             </form>
 
+            <h3>Testovací formulár</h3>
+            <form action="" method="post">
+                <div class="row mb-2">
+                    <div class="col-3">
+                        <label for="test-request-method" class="form-label">Request metóda</label>
+                        <select class="form-select" name="test-request-method" id="test-request-method">
+                            <option value="POST">POST</option>
+                            <option value="PUT">PUT</option>
+                            <option value="DELETE">DELETE</option>
+                        </select>
+                    </div>
+
+                    <div class="col-9">
+                        <label for="test-query-params" class="form-label">Query parametre</label>
+                        <input type="text" name="test-query-params" id="test-query-params" class="form-control">
+                    </div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-12">
+                        <label for="test-json-body" class="form-label">JSON request body</label>
+                        <textarea name="test-json-body" id="test-json-body" class="form-control" cols="30" rows="8"></textarea>
+                    </div>
+                </div>
+                <div class="row">
+                        <div class="col-12 d-grid">
+                            <button type="submit" name="action" value="test-api-request" class="btn btn-primary btn-lg">Pošli</button>
+                        </div>
+                    </div>
+            </form>
         </div>
         
     </div>

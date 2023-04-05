@@ -3,6 +3,15 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
+include_once('config.php');
+
+$sql = "SELECT * FROM restaurant";
+$stmt = $pdo->prepare($sql);
+$stmt->execute();
+$tmp_restaurant_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+foreach ($tmp_restaurant_data as $item)
+    $restaurant_names[$item['id']] = $item['name'];
+
 $day_filter = null;
 if (isset($_GET['day_filter']) && $_GET['day_filter'] != "all") {
     $day_filter = $_GET['day_filter'];
@@ -93,7 +102,7 @@ $this_sunday = date("d/m/Y", strtotime("Sunday this week"));
                     $null_days_data = array();
                 ?>
                 <div class="col-12 col-sm-4">
-                    <h3 class="text-center mb-2"><?php echo $restaurant_id; ?></h3>
+                    <h3 class="text-center mb-2"><?php echo $restaurant_names[$restaurant_id]; ?></h3>
                     <?php foreach ($restaurant_data as $day => $day_data): ?>
                         <?php if ($day != null): ?>
                         <div class="mb-3 pb-3">
@@ -118,7 +127,7 @@ $this_sunday = date("d/m/Y", strtotime("Sunday this week"));
 
                     <?php if (!empty($null_days_data)): ?>
                     <div>
-                        <h4>Mimo od dennej ponuky</h4>
+                        <h4>Mimo dennej ponuky</h4>
                         <div>
                         <?php foreach ($null_days_data as $data): ?>
                             <?php foreach ($data as $item): ?>
