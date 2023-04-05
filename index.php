@@ -3,16 +3,22 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-$response = file_get_contents('https://site60.webte.fei.stuba.sk/webte2-zadanie2/api/restaurants/meals/');
+$day_filter = null;
+if (isset($_GET['day_filter']) && $_GET['day_filter'] != "all") {
+    $day_filter = $_GET['day_filter'];
+    $date = date("Y-m-d", strtotime("{$day_filter} this week"));
+    $response = file_get_contents("https://site60.webte.fei.stuba.sk/webte2-zadanie2/api.php?date={$date}");
+}
+else
+    $response = file_get_contents('https://site60.webte.fei.stuba.sk/webte2-zadanie2/api.php');
 $response = json_decode($response, true);
 
 $grouped_data = array();
 foreach ($response as $item) {
-    if ($item['day'] !== null) {
-        $grouped_data[$item['restaurant_id']][$item['day']][] = $item;
-    } else {
+    if ($item['day'] !== null)
+            $grouped_data[$item['restaurant_id']][$item['day']][] = $item;
+    else
         $grouped_data[$item['restaurant_id']][null][] = $item;
-    }
 }
 
 $this_monday = date("d/m/Y", strtotime("Monday this week"));
@@ -49,14 +55,33 @@ $this_sunday = date("d/m/Y", strtotime("Sunday this week"));
             </nav>
             <div class="collapse" id="nav-toggle">
                 <div class="row dark-blue-color mx-0">
-                    <a class="col-12 col-md-6 py-3 nav-button-active d-flex justify-content-center" href="#">Jedálny lístok</a>
-                    <a class="col-12 col-md-6 py-3 d-flex justify-content-center" href="api_verify.php">Overenie API</a>
+                    <a class="col-12 col-md-4 py-3 nav-button-active d-flex justify-content-center" href="#">Jedálny lístok</a>
+                    <a class="col-12 col-md-4 py-3 d-flex justify-content-center" href="api_verify.php">Overenie API</a>
+                    <a class="col-12 col-md-4 py-3 d-flex justify-content-center" href="api_description.php">Popis API</a>
                 </div>
             </div>
         </div>
 
         <div class="page-content p-3">
             <h2 class="pb-3">Jedálny lístok <?php echo "({$this_monday} - {$this_sunday})"?></h2>
+            <form action="" method="get">
+                <div class="row mb-3">
+                    <div class="col-6">
+                        <select class="form-select" name="day_filter">
+                            <option value="all">Celý týždeň</option>
+                            <option <?php if ($day_filter == "Monday") {echo "selected";} ?> value="Monday">Pondelok</option>
+                            <option <?php if ($day_filter == "Tuesday") {echo "selected";} ?> value="Tuesday">Utorok</option>
+                            <option <?php if ($day_filter == "Wednesday") {echo "selected";} ?> value="Wednesday">Streda</option>
+                            <option <?php if ($day_filter == "Thursday") {echo "selected";} ?> value="Thursday">Štvrtok</option>
+                            <option <?php if ($day_filter == "Friday") {echo "selected";} ?> value="Friday">Piatok</option>
+                        </select>
+                    </div>
+                    <div class="col-6 d-grid">
+                        <button type="submit" class="btn btn-primary">Filtrovať</button>
+                    </div>
+                </div>
+            </form>
+
             <?php if (empty($response)): ?>
             <p>
                 V databáze nie sú žiadne dáta, prosím prejdite na podstránku Overenie API. 
@@ -67,16 +92,21 @@ $this_sunday = date("d/m/Y", strtotime("Sunday this week"));
                 <?php foreach ($grouped_data as $restaurant_id => $restaurant_data): 
                     $null_days_data = array();
                 ?>
-                <div class="col-4">
-                    <h3 class="text-center"><?php echo $restaurant_id; ?></h3>
+                <div class="col-12 col-sm-4">
+                    <h3 class="text-center mb-2"><?php echo $restaurant_id; ?></h3>
                     <?php foreach ($restaurant_data as $day => $day_data): ?>
                         <?php if ($day != null): ?>
-                        <div>
+                        <div class="mb-3 pb-3">
                             <h4><?php echo $day; ?></h4>
                             <div>
                             <?php foreach ($day_data as $item): ?>
-                                <h5><?php echo $item['description']; ?></h5>
-                                <p><?php echo $item['name']; ?></p>
+                                <div class="mb-2 pb-2 border-bottom">
+                                    <h5><?php echo $item['description']; ?></h5>
+                                    <div class="row">
+                                        <div class="col-9"><?php echo $item['name']; ?></div>
+                                        <div class="col-3"><?php echo $item['price']; ?></div>
+                                    </div>
+                                </div>
                             <?php endforeach; ?>
                             </div>
                         </div>
@@ -92,8 +122,13 @@ $this_sunday = date("d/m/Y", strtotime("Sunday this week"));
                         <div>
                         <?php foreach ($null_days_data as $data): ?>
                             <?php foreach ($data as $item): ?>
-                            <h5><?php echo $item['description']; ?></h5>
-                            <p><?php echo $item['name']; ?></p>
+                            <div class="mb-2 pb-2 border-bottom">
+                                <h5><?php echo $item['description']; ?></h5>
+                                <div class="row">
+                                    <div class="col-9"><?php echo $item['name']; ?></div>
+                                    <div class="col-3"><?php echo $item['price']; ?></div>
+                                </div>
+                            </div>
                             <?php endforeach; ?>
                         <?php endforeach; ?>
                         </div>
@@ -102,40 +137,6 @@ $this_sunday = date("d/m/Y", strtotime("Sunday this week"));
                 </div>
                 <?php endforeach; ?>
             </div>
-                    
-                <!-- foreach ($grouped_data as $restaurant_id => $restaurant_data) {
-                echo '<h2>Restaurant ID: ' . $restaurant_id . '</h2>';
-                echo '<table>';
-                echo '<tr><th>Day</th><th>Name</th><th>Description</th><th>Price</th></tr>';
-                foreach ($restaurant_data as $day => $day_data) {
-                    if ($day !== null) {
-                        echo '<tr><td colspan="4"><strong>' . $day . '</strong></td></tr>';
-                    }
-                    $displayed_days = array();
-                    foreach ($day_data as $item) {
-                        if ($day === null || !in_array($day, $displayed_days)) {
-                            echo '<tr>';
-                            echo '<td>' . ($day === null ? 'Null' : $day) . '</td>';
-                            echo '<td>' . $item['name'] . '</td>'; -->
-
-            <!-- <div class='row'>
-                <div class='col-4'>
-                    <h3 class="text-center">FIITFOOD</h3>
-                    <div>
-                        <h4>Monday</h4>
-                        <div>
-                            <h5>Polievka</h5>
-                            <p>Gulasova 5e</p>
-                        </div>
-                    </div>
-                </div>
-                <div class='col-4'>
-                    <h3 class="text-center">Venza</h3>
-                </div>
-                <div class='col-4'>
-                    <h3 class="text-center">Eat & Meet</h3>
-                </div>
-            </div> -->
             <?php endif; ?>
         </div>
         

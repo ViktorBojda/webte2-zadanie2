@@ -326,8 +326,9 @@ unset($pdo);
             </nav>
             <div class="collapse" id="nav-toggle">
                 <div class="row dark-blue-color mx-0">
-                    <a class="col-12 col-md-6 py-3 d-flex justify-content-center" href="index.php">Jedálny lístok</a>
-                    <a class="col-12 col-md-6 py-3 nav-button-active d-flex justify-content-center" href="#">Overenie API</a>
+                    <a class="col-12 col-md-4 py-3 d-flex justify-content-center" href="index.php">Jedálny lístok</a>
+                    <a class="col-12 col-md-4 py-3 nav-button-active d-flex justify-content-center" href="#">Overenie API</a>
+                    <a class="col-12 col-md-4 py-3 d-flex justify-content-center" href="api_description.php">Popis API</a>
                 </div>
             </div>
         </div>

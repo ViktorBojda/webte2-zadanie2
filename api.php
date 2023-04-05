@@ -6,7 +6,7 @@ error_reporting(E_ALL);
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 
-require_once('../../../config.php');
+require_once('config.php');
 
 switch($_SERVER['REQUEST_METHOD']) {
     case 'GET':
@@ -21,10 +21,14 @@ switch($_SERVER['REQUEST_METHOD']) {
     case 'PUT':
         if (isset($_GET['id']))
             update_meal($pdo, $_GET['id'], json_decode(file_get_contents('php://input'), true));
+        else
+            http_response_code(400);
         break;
     case 'DELETE':
-        $id = $_GET['id'];
-        // delete_games($db, $id);
+        if (isset($_GET['id']))
+            delete_meals_by_restaurant_id($pdo, $_GET['id']);
+        else
+            http_response_code(400);
         break;
 }
 
@@ -47,7 +51,7 @@ function read_meals_by_date($pdo, $date) {
 }
 
 function create_meal($pdo, $data) {
-    if (!array_keys_exist(['name', 'restaurant_id', 'description', 'price', 'day', 'start_date', 'end_date'], $data)) {
+    if (!array_keys_exist(['name', 'restaurant_id', 'description', 'price', 'start_date', 'end_date'], $data)) {
         echo json_encode(array('error' => 'Create failed, missing parameters'));
         http_response_code(400);
         return;
@@ -56,7 +60,7 @@ function create_meal($pdo, $data) {
     $sql = "SELECT id FROM restaurant WHERE id = ?";
     $stmt = $pdo->prepare($sql);
     $stmt->execute([$data['restaurant_id']]);
-    if (is_empty($stmt->fetchColumn())) {
+    if (empty($stmt->fetchColumn())) {
         echo json_encode(array('error' => 'Create failed, incorrect restaurant_id'));
         http_response_code(400);
         return;
@@ -65,7 +69,7 @@ function create_meal($pdo, $data) {
     $sql = "SELECT id FROM menu_item WHERE name = ? AND restaurant_id = ?";
     $stmt = $pdo->prepare($sql);
     $stmt->execute([$data['name'], $data['restaurant_id']]);
-    if (!is_empty($stmt->fetchColumn())) {
+    if (!empty($stmt->fetchColumn())) {
         echo json_encode(array('error' => 'Create failed, duplicate name and restaurant_id values'));
         http_response_code(400);
         return;
@@ -77,10 +81,10 @@ function create_meal($pdo, $data) {
         http_response_code(400);
         return;
     }
-    else {
-        $data['start_date'] = $start_date;
-        $data['end_date'] = $end_date;
-    }
+    
+    $day = null;
+    if ($start_date == $end_date)
+        $day = date("l", strtotime($start_date));
 
     $sql = "INSERT INTO menu_item (name, restaurant_id, description, price, day, start_date, end_date) VALUES (:name, :restaurant_id, :description, :price, :day, :start_date, :end_date)";
     $stmt = $pdo->prepare($sql);
@@ -89,9 +93,9 @@ function create_meal($pdo, $data) {
         ":restaurant_id" => $data['restaurant_id'],
         ":description" => $data["description"],
         ":price" => $data["price"],
-        ":day" => $data['day'],
-        ":start_date" => $data['start_date'],
-        ":end_date" => $data['end_date']
+        ":day" => $day,
+        ":start_date" => $start_date,
+        ":end_date" => $end_date
     ])) {
         echo json_encode(array('error' => 'Create failed'));
         http_response_code(400);
@@ -104,7 +108,11 @@ function update_meal($pdo, $id, $data) {
     $sql = "SELECT * FROM menu_item WHERE id = ?";
     $stmt = $pdo->prepare($sql);
     $stmt->execute([$id]);
-    $meal = $stmt->fetch();
+    if (!$meal = $stmt->fetch()) {
+        echo json_encode(array('error' => 'Update failed, nonexisting id'));
+        http_response_code(400);
+        return;
+    }
 
     foreach ($meal as $key => $value)
         if (array_key_exists($key, $data))
@@ -116,10 +124,29 @@ function update_meal($pdo, $id, $data) {
         http_response_code(400);
         return;
     }
-    else {
-        $meal['start_date'] = $start_date;
-        $meal['end_date'] = $end_date;
+
+    $sql = "SELECT id FROM restaurant WHERE id = ?";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$meal['restaurant_id']]);
+    if (empty($stmt->fetchColumn())) {
+        echo json_encode(array('error' => 'Update failed, incorrect restaurant_id'));
+        http_response_code(400);
+        return;
     }
+
+    $sql = "SELECT id FROM menu_item WHERE name = ? AND restaurant_id = ?";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$meal['name'], $meal['restaurant_id']]);
+    $found_id = $stmt->fetchColumn();
+    if (!empty($found_id) && $found_id != $id) {
+        echo json_encode(array('error' => 'Update failed, duplicate name and restaurant_id values'));
+        http_response_code(400);
+        return;
+    }
+
+    $day = null;
+    if ($start_date == $end_date)
+        $day = date("l", strtotime($start_date));
 
     $sql = "UPDATE menu_item SET name = :name, restaurant_id = :restaurant_id, description = :description, price = :price, day = :day, start_date = :start_date, end_date = :end_date WHERE id = :id";
     $stmt = $pdo->prepare($sql);
@@ -128,25 +155,22 @@ function update_meal($pdo, $id, $data) {
         ":restaurant_id" => $meal['restaurant_id'],
         ":description" => $meal["description"],
         ":price" => $meal["price"],
-        ":day" => $meal['day'],
-        ":start_date" => $meal['start_date'],
-        ":end_date" => $meal['end_date'],
+        ":day" => $day,
+        ":start_date" => $start_date,
+        ":end_date" => $end_date,
         ":id" => $id
     ]))
         echo json_encode(array('error' => 'Update failed'));
     echo json_encode(array('success' => 'Data updated successfully'));
 }
 
-function delete_games($db, $id) {
-    if(!is_empty($id)) {
+function delete_meals_by_restaurant_id($pdo, $restaurant_id) {
+    $stmt = $pdo->prepare('DELETE FROM menu_item WHERE restaurant_id = ?');
+    if ($stmt->execute([$restaurant_id]))
+        echo json_encode(array('success' => 'Data deleted successfully'));
+    else {
         echo json_encode(array('error' => 'Delete failed'));
         http_response_code(400);
-        return;
-    } else {
-        $stmt = $db->prepare('DELETE FROM games WHERE id = :id');
-        $stmt->bindParam(':id', $id);
-        $stmt->execute();
-        echo json_encode(array('success' => 'Data deleted successfully'));
     }
 }
 
@@ -155,13 +179,6 @@ function array_keys_exist($keys, $array){
         if(!array_key_exists($key, $array))
             return false;
     return true;
-}
-
-function is_empty($param) {
-    if(empty($param))
-        return true;
-    else
-        return false;
 }
 
 function check_date_range($start_date, $end_date) {
